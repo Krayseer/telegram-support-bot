@@ -1,6 +1,7 @@
 import telebot
 import os
 from dotenv import load_dotenv
+from transformers import pipeline
 
 from message_provider import MessageProvider
 
@@ -11,6 +12,20 @@ load_dotenv()
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 bot = telebot.TeleBot(BOT_TOKEN)
 message_provider = MessageProvider()
+
+# Модель
+model_pipeline = pipeline(
+    task='question-answering',
+    model='timpal0l/mdeberta-v3-base-squad2'
+)
+
+# Контекст, далее это будет файл
+context = ('Пачки скидываются потому, что'
+         ' не читались этикетки'
+         ' У вас закончились вычислительные единицы.'
+         ' Доступ к бесплатным ресурсам не гарантирован.'
+         ' Были частые сбросы за пинцет. Увеличили количество обрабатываемых кадров для считывания qr-кодов.'
+         ' Сбросы за пинцет прекратились.')
 
 
 # Обработка команд
@@ -27,7 +42,7 @@ def echo_all(message):
 
 # Получить ответ на запрос пользователя
 def handleRequest(message):
-    return message_provider.get_message_by_key('redirect.admin')
+    return model_pipeline(question=message, context=context)
 
 
 # Запуск бота
