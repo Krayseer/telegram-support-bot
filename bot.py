@@ -5,8 +5,15 @@ from transformers import pipeline
 import torch
 import numpy as np
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering
+import time
 
 from message_provider import MessageProvider
+
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.keys import Keys
 
 # Загрузка виртуальных переменных
 load_dotenv()
@@ -48,7 +55,27 @@ def handleRequest(message):
     tokenizer = AutoTokenizer.from_pretrained("timpal0l/mdeberta-v3-base-squad2")
     model = AutoModelForQuestionAnswering.from_pretrained("timpal0l/mdeberta-v3-base-squad2")
 
-    question = 'Почему пачки сбрасываются?'
+    driver = webdriver.Chrome()  # Используйте свой драйвер (Chrome, Firefox и т.д.)
+    # Открытие страницы
+    driver.get("https://ya.ru/alisa_davay_pridumaem?utm_source=landing")
+    time.sleep(5)
+    input_element = WebDriverWait(driver, 20).until(
+        EC.presence_of_element_located((By.CLASS_NAME, "input-container__text-input"))
+    )
+    # Ввод сообщения
+    input_element.send_keys("Сделай из этого \"" + message + "\" вопрос для модели Bert")
+    # Например, для нажатия Enter после ввода сообщения
+    input_element.send_keys(Keys.RETURN)
+    time.sleep(10)
+    response_elements = WebDriverWait(driver, 60).until(
+        EC.presence_of_all_elements_located((By.CLASS_NAME, "message-bubble"))
+    )
+    driver.quit()
+
+    # Выбор последнего элемента из списка
+    last_response_element = response_elements[-1] if response_elements else None
+
+    question = last_response_element.text
     with open('./new_data.txt', 'r', encoding='utf-8') as file:
         text_from_file = file.read()
 
