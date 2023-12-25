@@ -1,27 +1,8 @@
-import telebot
-import os
-from dotenv import load_dotenv
-from transformers import pipeline
-import torch
 import numpy as np
-from transformers import AutoTokenizer, AutoModelForQuestionAnswering
-import time
+import torch
+from transformers import AutoTokenizer, AutoModelForQuestionAnswering, pipeline
+from gpt_service import handleMessageToQuestion, handleMessageToAnswer
 
-from message_provider import MessageProvider
-
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.keys import Keys
-
-# Загрузка виртуальных переменных
-load_dotenv()
-
-# Инициализация бота
-BOT_TOKEN = os.getenv('BOT_TOKEN')
-bot = telebot.TeleBot(BOT_TOKEN)
-message_provider = MessageProvider()
 
 # Модель
 model_pipeline = pipeline(
@@ -29,61 +10,16 @@ model_pipeline = pipeline(
     model='timpal0l/mdeberta-v3-base-squad2'
 )
 
-# Контекст, далее это будет файл
-context = ('Пачки скидываются потому, что'
-         ' не читались этикетки'
-         ' У вас закончились вычислительные единицы.'
-         ' Доступ к бесплатным ресурсам не гарантирован.'
-         ' Были частые сбросы за пинцет. Увеличили количество обрабатываемых кадров для считывания qr-кодов.'
-         ' Сбросы за пинцет прекратились.')
 
-
-# Обработка команд
-@bot.message_handler(commands=['start'])
-def send_welcome(message):
-    bot.reply_to(message, message_provider.get_message_by_key('start.bot'))
-
-
-# Обработка сообщений
-@bot.message_handler(func=lambda message: True)
-def echo_all(message):
-    bot.reply_to(message, handleRequest(message.text))
-
-
-# Получить ответ на запрос пользователя
-def handleRequest(message):
+def handle(message):
     tokenizer = AutoTokenizer.from_pretrained("timpal0l/mdeberta-v3-base-squad2")
     model = AutoModelForQuestionAnswering.from_pretrained("timpal0l/mdeberta-v3-base-squad2")
 
-    driver = webdriver.Chrome()  # Используйте свой драйвер (Chrome, Firefox и т.д.)
-    # Открытие страницы
-    driver.get("https://ya.ru/alisa_davay_pridumaem?utm_source=landing")
-    time.sleep(5)
-    input_element = WebDriverWait(driver, 20).until(
-        EC.presence_of_element_located((By.CLASS_NAME, "input-container__text-input"))
-    )
-    # Ввод сообщения
-    input_element.send_keys("Сделай из этого \"" + message + "\" вопрос для модели Bert")
-    # Например, для нажатия Enter после ввода сообщения
-    input_element.send_keys(Keys.RETURN)
-    time.sleep(10)
-    response_elements = WebDriverWait(driver, 60).until(
-        EC.presence_of_all_elements_located((By.CLASS_NAME, "message-bubble"))
-    )
-    driver.quit()
-
-    # Выбор последнего элемента из списка
-    last_response_element = response_elements[-1] if response_elements else None
-
-    question = last_response_element.text
-    with open('./new_data.txt', 'r', encoding='utf-8') as file:
+    question = handleMessageToQuestion(message)
+    with open('../new_data.txt', 'r', encoding='utf-8') as file:
         text_from_file = file.read()
 
-    tokenized = tokenizer.encode_plus(
-        question, text_from_file,
-        add_special_tokens=False
-    )
-
+    tokenized = tokenizer.encode_plus(question, text_from_file, add_special_tokens=False)
     tokens = tokenizer.convert_ids_to_tokens(tokenized['input_ids'])
 
     max_chunk_length = 512
@@ -164,9 +100,4 @@ def handleRequest(message):
         [t.replace('▁', ' ') for t in tokens[start_index:end_index + 1]]
     )
 
-    return answer
-
-
-# Запуск бота
-if __name__ == '__main__':
-    bot.infinity_polling()
+    return handleMessageToAnswer(answer)
