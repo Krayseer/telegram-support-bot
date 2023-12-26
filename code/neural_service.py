@@ -1,7 +1,6 @@
 import numpy as np
 import torch
 from transformers import AutoTokenizer, AutoModelForQuestionAnswering, pipeline
-from gpt_service import handleMessageToQuestion, handleMessageToAnswer
 
 
 # Модель
@@ -11,11 +10,10 @@ model_pipeline = pipeline(
 )
 
 
-def handle(message):
+def handle(question):
     tokenizer = AutoTokenizer.from_pretrained("timpal0l/mdeberta-v3-base-squad2")
     model = AutoModelForQuestionAnswering.from_pretrained("timpal0l/mdeberta-v3-base-squad2")
 
-    question = handleMessageToQuestion(message)
     with open('../new_data.txt', 'r', encoding='utf-8') as file:
         text_from_file = file.read()
 
@@ -39,18 +37,14 @@ def handle(message):
         padding_length = context_chunk_length - (len(others) % context_chunk_length)
         others += [0] * padding_length
 
-        new_size = (
-            len(others) // context_chunk_length,
-            context_chunk_length
-        )
-
+        new_size = (len(others) // context_chunk_length, context_chunk_length)
         new_context_input_ids = np.reshape(others, new_size)
 
-        overlappeds = new_context_input_ids[:, -overlapped_length:]
-        overlappeds = np.insert(overlappeds, 0, first[-overlapped_length:], axis=0)
-        overlappeds = overlappeds[:-1]
+        overlaps = new_context_input_ids[:, -overlapped_length:]
+        overlaps = np.insert(overlaps, 0, first[-overlapped_length:], axis=0)
+        overlaps = overlaps[:-1]
 
-        new_context_input_ids = np.c_[overlappeds, new_context_input_ids]
+        new_context_input_ids = np.c_[overlaps, new_context_input_ids]
         new_context_input_ids = np.insert(new_context_input_ids, 0, first, axis=0)
 
         new_input_ids = np.c_[
@@ -59,16 +53,10 @@ def handle(message):
         ]
     else:
         padding_length = first_context_chunk_length - (len(first) % first_context_chunk_length)
-        new_input_ids = np.array(
-            [answer_input_ids + first + [0] * padding_length]
-        )
+        new_input_ids = np.array([answer_input_ids + first + [0] * padding_length])
 
     count_chunks = new_input_ids.shape[0]
-
-    new_token_type_ids = [
-                             [0] * answer_tokens_length + [1] * (max_chunk_length - answer_tokens_length)
-                         ] * count_chunks
-
+    new_token_type_ids = [[0] * answer_tokens_length + [1] * (max_chunk_length - answer_tokens_length)] * count_chunks
     new_attention_mask = (
             [[1] * max_chunk_length] * (count_chunks - 1) +
             [([1] * (max_chunk_length - padding_length)) + ([0] * padding_length)]
@@ -96,8 +84,6 @@ def handle(message):
             * (end_index // max_chunk_length)
     )
 
-    answer = ''.join(
-        [t.replace('▁', ' ') for t in tokens[start_index:end_index + 1]]
-    )
+    answer = ''.join([t.replace('▁', ' ') for t in tokens[start_index:end_index + 1]])
 
-    return handleMessageToAnswer(answer)
+    return answer

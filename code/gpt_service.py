@@ -8,13 +8,20 @@ load_dotenv()
 
 
 def handleMessageToQuestion(text):
-    return handleMessage(f'{get_message_by_key("message.to-question")}: {text}')
+    json_data = {
+        "text": f'{get_message_by_key("message.to-question")}: {text}'
+    }
+    return handleMessage(json_data)
 
 
 def handleMessageToAnswer(text):
-    return handleMessage(f'{get_message_by_key("message.to-answer")}: {text}')
+    json_data = {
+        "text": f'{get_message_by_key("message.to-answer")}: {text}',
+        "time": "6000"
+    }
+    return handleMessage(json_data)
 
 
-def handleMessage(data):
+def handleMessage(json_data):
     url = os.getenv('GPT_URL')
-    return requests.post(url, json={"text": data}).text
+    return requests.post(url, json=json_data).text
