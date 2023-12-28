@@ -13,7 +13,7 @@ def generate_answer(question):
     tokenizer = transformers.AutoTokenizer.from_pretrained("timpal0l/mdeberta-v3-base-squad2")
     model = transformers.AutoModelForQuestionAnswering.from_pretrained("timpal0l/mdeberta-v3-base-squad2")
 
-    with open('../../context.txt', 'r', encoding='utf-8') as file:
+    with open('C:/home/python/Проекты/telegram-bot-helper/context.txt', 'r', encoding='utf-8') as file:
         text_from_file = file.read()
 
     tokenized = tokenizer.encode_plus(question, text_from_file, add_special_tokens=False)
