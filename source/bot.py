@@ -1,52 +1,67 @@
+import json
 import telebot
 import config
-import source.service.neural_service as neural_service
 import messages
+import source.service.neural_service as neural_service
 import source.service.gpt_service as gpt_service
 import source.service.db_service as db_service
 
-# Инициализация бота
 BOT_TOKEN = config.BOT_TOKEN
 CHAT_ID = config.TELEGRAM_CHAT_ID
 bot = telebot.TeleBot(BOT_TOKEN)
 
 
-# Обработка команд
+def create_inline_keyboard(question):
+    yesButton = telebot.types.InlineKeyboardButton(text="Да", callback_data=json.dumps(
+        {'name': 'YES', 'question': question}
+    ))
+    noButton = telebot.types.InlineKeyboardButton(text="Нет", callback_data=json.dumps(
+        {'name': 'NO', 'question': question}
+    ))
+    nextButton = telebot.types.InlineKeyboardButton(text='В тех-поддержку', callback_data=json.dumps(
+        {'name': 'TO_ADMIN', 'question': question}
+    ))
+    return telebot.types.InlineKeyboardMarkup().add(yesButton, noButton, nextButton)
+
+
 @bot.message_handler(commands=['start'])
 def send_welcome():
     bot.send_message(CHAT_ID, messages.get_message_by_key('start.bot'))
 
 
-# Обработка сообщений
 @bot.message_handler(func=lambda message: True)
-def echo_all(message):
-    question_to_handle = gpt_service.handleMessageToQuestion(message.text)
+def handle_messages(message):
+    question = message.text
+    question_to_handle = gpt_service.handleMessageToQuestion(question)
     result = gpt_service.handleMessageToAnswer(neural_service.generate_answer(question_to_handle))
-    bot.send_message(CHAT_ID, f'Вопрос: {question_to_handle}\n\nОтвет: {result}',
-                     reply_markup=get_buttons_for_message())
-
-
-def get_buttons_for_message():
-    yesButton = telebot.types.InlineKeyboardButton(text="Да", callback_data="In_yesButton")
-    noButton = telebot.types.InlineKeyboardButton(text="Нет", callback_data="In_noButton")
-    nextButton = telebot.types.InlineKeyboardButton(text="Следующий", callback_data="In_nextButton")
-    return telebot.types.InlineKeyboardMarkup().add(yesButton, noButton, nextButton)
+    buttons = create_inline_keyboard(question)
+    bot.send_message(CHAT_ID, f'Вопрос: {question}\n\nОтвет: {result}', reply_markup=buttons)
 
 
 @bot.callback_query_handler(func=lambda call: True)
 def handle_callback_query(call):
-    if call.data == 'In_yesButton':
+    call_data = json.loads(call.data)
+    name = call_data['name']
+    question = call_data['question']
+
+    if name == 'YES':
         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id, text=call.message.text)
-        db_service.add_question(call.message.text, 'COMPLETE', call.message.message_id)
-    elif call.data == 'In_noButton':
-        question_to_handle = gpt_service.handleMessageToQuestion(call.message.text)
+        db_service.add_question(question, 'COMPLETE', call.message.message_id)
+
+    elif name == 'NO':
+        bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                              text=f'Вопрос: {question}\n\nВопрос обрабатывается...')
+        question_to_handle = gpt_service.handleMessageToQuestion(question)
         result = gpt_service.handleMessageToAnswer(neural_service.generate_answer(question_to_handle))
-        bot.send_message(CHAT_ID, f'Вопрос: {question_to_handle}\n\nОтвет: {result}',
-                         reply_markup=get_buttons_for_message())
-    elif call.data == 'In_nextButton':
-        db_service.add_question(call.message.text, 'WAIT', call.message.message_id)
+        buttons = create_inline_keyboard(question)
+        bot.edit_message_text(chat_id=CHAT_ID, message_id=call.message.message_id,
+                              text=f'Вопрос: {question}\n\nОтвет: {result}', reply_markup=buttons)
+
+    elif name == 'TO_ADMIN':
+        db_service.add_question(question, 'WAIT', call.message.message_id)
+        bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
+                              text=f'Вопрос: {question}\n\nОжидается ответ администратора...')
 
 
-# Запуск бота
 if __name__ == '__main__':
     bot.infinity_polling()
