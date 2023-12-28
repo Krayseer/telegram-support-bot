@@ -1,20 +1,19 @@
 import numpy as np
 import torch
-from transformers import AutoTokenizer, AutoModelForQuestionAnswering, pipeline
-
+import transformers
 
 # Модель
-model_pipeline = pipeline(
+model_pipeline = transformers.pipeline(
     task='question-answering',
     model='timpal0l/mdeberta-v3-base-squad2'
 )
 
 
-def handle(question):
-    tokenizer = AutoTokenizer.from_pretrained("timpal0l/mdeberta-v3-base-squad2")
-    model = AutoModelForQuestionAnswering.from_pretrained("timpal0l/mdeberta-v3-base-squad2")
+def generate_answer(question):
+    tokenizer = transformers.AutoTokenizer.from_pretrained("timpal0l/mdeberta-v3-base-squad2")
+    model = transformers.AutoModelForQuestionAnswering.from_pretrained("timpal0l/mdeberta-v3-base-squad2")
 
-    with open('../new_data.txt', 'r', encoding='utf-8') as file:
+    with open('../../context.txt', 'r', encoding='utf-8') as file:
         text_from_file = file.read()
 
     tokenized = tokenizer.encode_plus(question, text_from_file, add_special_tokens=False)

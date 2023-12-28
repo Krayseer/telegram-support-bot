@@ -5,14 +5,13 @@
 
 ## Установка
 
-1. Сначала убедитесь, что у вас установлен Python.
-2. Клонируйте репозиторий: git clone ```https://github.com/Krayseer/telegram-support-bot```
-3. Перейдите в директорию проекта: ```cd telegram-support-bot```
-4. Установите необходимые зависимости: ```pip install -r requirements.txt```
+1. Клонируйте репозиторий: ```git clone https://github.com/Krayseer/telegram-support-bot```
+2. Перейдите в директорию проекта: ```cd telegram-support-bot```
+3. Установите необходимые зависимости: ```pip install -r requirements.txt```
 
 ## Использование
 1. Создайте бота в Telegram.
 2. Получите токен бота.
-3. Замените значение переменной **TELEGRAM_BOT_TOKEN** в файле **config.py** на ваш токен: ```TELEGRAM_BOT_TOKEN = 'your_telegram_bot_token'```
-4. Обучите нейронную сеть, запустив скрипт train.py: ```python train.py```. Этот шаг создаст и обучит модель на основе предоставленного набора данных.
-5. Запустите бота с помощью скрипта main.py: ```python main.py```
+3. В файле config.py установите необходимые вам параметры для работы бота
+4. Если необходимо запустить свой гпт сервис, то выполните команду ```docker compose up```
+5. Запустите бота с помощью скрипта main.py: ```python source/bot.py```
