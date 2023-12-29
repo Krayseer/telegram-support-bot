@@ -1,8 +1,5 @@
-import config
 import requests
-import source.messages as messages
-
-gpt_url = config.GPT_URL
+from src import messages, config
 
 
 def handleMessageToQuestion(text):
@@ -21,5 +18,4 @@ def handleMessageToAnswer(text):
 
 
 def handleMessage(json_data):
-    url = gpt_url + '/process'
-    return requests.post(url, json=json_data).text
+    return requests.post(config.GPT_URL, json=json_data).text

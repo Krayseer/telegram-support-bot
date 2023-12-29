@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import torch
 import transformers
@@ -13,7 +15,8 @@ def generate_answer(question):
     tokenizer = transformers.AutoTokenizer.from_pretrained("timpal0l/mdeberta-v3-base-squad2")
     model = transformers.AutoModelForQuestionAnswering.from_pretrained("timpal0l/mdeberta-v3-base-squad2")
 
-    with open('C:/home/python/Проекты/telegram-bot-helper/context.txt', 'r', encoding='utf-8') as file:
+    file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../context.txt'))
+    with open(file_path, 'r', encoding='utf-8') as file:
         text_from_file = file.read()
 
     tokenized = tokenizer.encode_plus(question, text_from_file, add_special_tokens=False)
