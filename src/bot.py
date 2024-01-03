@@ -9,12 +9,18 @@ from src.service import gpt_service
 
 bot = telebot.TeleBot(config.BOT_TOKEN)
 
+# Создаем таблицы в бд
+db_service.create_tables_for_db()
+
 
 # Получить из сообщения текст вопроса в кавычках
 def extract_question_from_message(msg):
     match = re.search(r'Вопрос: "(.*?)"', msg)
     return match.group(1) if match else None
 
+def extract_id_message_from_message(msg):
+    match = re.search(r'ID заявки: "(.*?)"', msg)
+    return match.group(1) if match else None
 
 # Получить кнопки "Да/Нет/На администратора"
 def create_inline_keyboard():
@@ -34,58 +40,62 @@ def send_welcome():
 @bot.message_handler(commands=['login'])
 def login(message):
     if len(message.text.split()) != 2:
-        bot.send_message(message.from_user.id, messages.get_message_by_key("login.invalid.format"))
+        bot.send_message(message.chat.id, messages.get_message_by_key("login.invalid.format"))
         return
     if message.text.split()[1] != config.ADMIN_SECRET:
-        bot.send_message(message.from_user.id, messages.get_message_by_key('login.invalid.secret-key'))
+        bot.send_message(message.chat.id, messages.get_message_by_key('login.invalid.secret-key'))
         return
-    db_service.add_admin(message.from_user.id)
-    bot.send_message(message.from_user.id, messages.get_message_by_key('login.success'))
+    db_service.add_admin(message.chat.id)
+    bot.send_message(message.chat.id, messages.get_message_by_key('login.success'))
 
 
 # Обработка удаления администратора
 @bot.message_handler(commands=['logout'])
 def logout(message):
-    if not db_service.is_admin(message.from_user.id):
-        bot.send_message(message.from_user.id, messages.get_message_by_key('logout.error'))
+    if not db_service.is_admin(message.chat.id):
+        bot.send_message(message.chat.id, messages.get_message_by_key('logout.error'))
         return
-    db_service.remove_admin(message.from_user.id)
-    bot.send_message(message.from_user.id, messages.get_message_by_key('logout.success'))
+    db_service.remove_admin(message.chat.id)
+    bot.send_message(message.chat.id, messages.get_message_by_key('logout.success'))
 
 
 # Выводит все необработанные заявки от пользователей
 @bot.message_handler(commands=['get_all'])
 def get_all(message):
-    if not db_service.is_admin(message.from_user.id):
-        bot.send_message(message.from_user.id, "У вас нет прав для выполнения этой команды.")
+    if not db_service.is_admin(message.chat.id):
+        bot.send_message(message.chat.id, "У вас нет прав для выполнения этой команды.")
         return
     all_requests = db_service.get_WAIT_requests()
     if not all_requests:
-        bot.send_message(message.from_user.id, "Необработанных заявок не найдено.")
+        bot.send_message(message.chat.id, "Необработанных заявок не найдено.")
         return
     for request in all_requests:
         process_button = telebot.types.InlineKeyboardButton(text="Обработать заявку", callback_data='PROCESSING')
-        bot.send_message(message.from_user.id, f'ID заявки: {request[0]}\nВопрос: "{request[1]}"',
+        bot.send_message(message.chat.id, f'ID заявки: "{request[3]}"\nВопрос: "{request[1]}"',
                          reply_markup=telebot.types.InlineKeyboardMarkup().add(process_button))
 
 
 @bot.message_handler(func=lambda message: message.is_topic_message)
-def handle_messages(message):
-    if db_service.is_admin(message.from_user.id):
-        chat_state = db_service.get_chat_state(message.chat.id)
-        question = chat_state[1]
-        id_message = db_service.find_question_by_text(question)
-        bot.edit_message_text(chat_id=config.TELEGRAM_CHAT_ID, message_id=id_message,
-                              text=f'Вопрос: "{question}"\n\nОтвет от администратора: {message.text}')
-        bot.send_message(message.from_user.id, "Ваш ответ отправлен.")
-        db_service.update_request_status(id_message)
-        db_service.remove_chat_state(message.from_user.id)
-    else:
-        question = message.text
-        question_to_handle = gpt_service.handleMessageToQuestion(question)
-        result = gpt_service.handleMessageToAnswer(neural_service.generate_answer(question_to_handle))
-        bot.send_message(config.TELEGRAM_CHAT_ID, f'Вопрос: "{question}"\n\nОтвет: {result}',
-                         reply_markup=create_inline_keyboard())
+def handle_messages_is_topic(message):
+    question = message.text
+    # question_to_handle = gpt_service.handleMessageToQuestion(question)
+    # result = gpt_service.handleMessageToAnswer(neural_service.generate_answer(question_to_handle))
+    bot.send_message(config.TELEGRAM_CHAT_ID, f'Вопрос: "{question}"\n\nОтвет: {question}',
+                     reply_markup=create_inline_keyboard())
+
+
+@bot.message_handler(func=lambda message: not message.is_topic_message and db_service.is_admin(message.chat.id))
+def handle_message(message):
+    chat_state = db_service.get_chat_state(message.chat.id)
+    question = chat_state[1]
+    id_message = extract_id_message_from_message(question)
+    # id_message = db_service.find_question_by_text(question)
+    bot.edit_message_text(chat_id=config.TELEGRAM_CHAT_ID, message_id=id_message,
+                          text=f'{question}"\n\nОтвет от администратора: {message.text}')
+    bot.send_message(config.TELEGRAM_CHAT_ID, f'Ответ от администратора: {message.text}', reply_to_message_id=id_message)
+    bot.send_message(message.chat.id, "Ваш ответ отправлен.")
+    db_service.update_request_status(id_message)
+    db_service.remove_chat_state(message.chat.id)
 
 
 @bot.callback_query_handler(func=lambda call: True)
@@ -99,18 +109,19 @@ def handle_callback_query(call):
     elif call.data == 'NO':
         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                               text=f'Вопрос: "{question}"\n\nВопрос обрабатывается...')
-        question_to_handle = gpt_service.handleMessageToQuestion(question)
-        result = gpt_service.handleMessageToAnswer(neural_service.generate_answer(question_to_handle))
+        # question_to_handle = gpt_service.handleMessageToQuestion(question)
+        # result = gpt_service.handleMessageToAnswer(neural_service.generate_answer(question_to_handle))
         bot.edit_message_text(chat_id=config.TELEGRAM_CHAT_ID, message_id=call.message.message_id,
-                              text=f'Вопрос: "{question}"\n\nОтвет: {result}', reply_markup=create_inline_keyboard())
+                              text=f'Вопрос: "{question}"\n\nОтвет: {question}', reply_markup=create_inline_keyboard())
 
     elif call.data == 'TO_ADMIN':
+
         db_service.add_question(question, 'WAIT', call.message.message_id)
         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                               text=f'Вопрос: "{question}"\n\nОжидается ответ администратора...')
 
     elif call.data == 'PROCESSING':
-        db_service.add_chat_state(call.message.chat.id, question)
+        db_service.add_chat_state(call.message.chat.id, call.message.text)
         bot.send_message(call.message.chat.id, f'Введите ответ на вопрос: {question}')
 
 
