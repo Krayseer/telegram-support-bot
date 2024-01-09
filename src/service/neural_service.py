@@ -86,6 +86,4 @@ def generate_answer(question):
             * (end_index // max_chunk_length)
     )
 
-    answer = ''.join([t.replace('▁', ' ') for t in tokens[start_index:end_index + 1]])
-
-    return answer
+    return ''.join([t.replace('▁', ' ') for t in tokens[start_index:end_index + 1]])

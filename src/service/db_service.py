@@ -3,21 +3,19 @@ import sqlite3
 name = '../helper.db'
 
 
+# Создать таблицы в БД, если они не существуют
 def create_tables_for_db():
     with sqlite3.connect(name) as conn:
         cursor = conn.cursor()
-        # Создаем таблицу авторизованных админов, если её нет
         cursor.execute('''CREATE TABLE IF NOT EXISTS admins (
                             admin_id INTEGER PRIMARY KEY
                         )''')
-        # Создаем таблицу всез запросов, если её нет
         cursor.execute('''CREATE TABLE IF NOT EXISTS QuestionsStatus (
                                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                                 question TEXT,
                                 status TEXT,
                                 message_id INTEGER
                             )''')
-        # Создаем таблицу для состояния чата, если её нет
         cursor.execute('''CREATE TABLE IF NOT EXISTS ChatStates (
                                     chat_id INTEGER PRIMARY KEY,
                                     question_text TEXT,
@@ -52,7 +50,7 @@ def remove_admin(chat_id):
 
 
 # Проверить, является ли пользователь админом
-def is_admin(chat_id):
+def is_user_admin(chat_id):
     conn = sqlite3.connect(name)
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM admins WHERE admin_id = ?', (chat_id,))
@@ -62,12 +60,11 @@ def is_admin(chat_id):
 
 
 # Получить все необработанные заявки
-def get_WAIT_requests():
+def get_all_tasks():
     with sqlite3.connect(name) as conn:
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM QuestionsStatus WHERE status = ?', ('WAIT',))
-        waiting_requests = cursor.fetchall()
-        return waiting_requests
+        return cursor.fetchall()
 
 
 # Изменить статус заявки
@@ -82,8 +79,7 @@ def find_question_by_text(question_text):
     with sqlite3.connect(name) as conn:
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM QuestionsStatus WHERE question = ?', (question_text,))
-        question = cursor.fetchone()
-        return question[3]
+        return cursor.fetchone()[3]
 
 
 # Добавить состояние чата
@@ -100,8 +96,7 @@ def get_chat_state(chat_id):
     with sqlite3.connect(name) as conn:
         cursor = conn.cursor()
         cursor.execute('SELECT * FROM ChatStates WHERE chat_id = ?', (chat_id,))
-        result = cursor.fetchone()
-        return result
+        return cursor.fetchone()
 
 
 # Удалить состояние чата
@@ -110,11 +105,3 @@ def remove_chat_state(chat_id):
         cursor = conn.cursor()
         cursor.execute('DELETE FROM ChatStates WHERE chat_id = ?', (chat_id,))
         conn.commit()
-
-
-# Поиск заявки по id
-def find_question_by_id(question_id):
-    with sqlite3.connect(name) as conn:
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM QuestionsStatus WHERE id = ?', (question_id,))
-        return cursor.fetchone()
