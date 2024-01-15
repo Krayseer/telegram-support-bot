@@ -81,11 +81,11 @@ def get_tasks(message):
 @bot.message_handler(func=lambda message: message.is_topic_message)
 def handle_messages_is_topic(message):
     question = message.text
-    result = neural_service.generate_answer(question) if config.GPT_URL is None else (
-        gpt_service.handleMessageToAnswer(
-            neural_service.generate_answer(gpt_service.handleMessageToQuestion(question))
-        )
-    )
+    questToHandle = question if config.GPT_URL is None else gpt_service.handleMessageToQuestion(question)
+    generated_answer = neural_service.generate_answer(questToHandle)
+    result = gpt_service.handleMessageToAnswer(generated_answer) \
+        if config.GPT_URL and len(generated_answer.split('.')) > 2 \
+        else generated_answer
     bot.send_message(config.TELEGRAM_CHAT_ID, f'Вопрос: "{question}"\n\nОтвет: {result}',
                      reply_markup=create_inline_keyboard())
 
@@ -114,9 +114,12 @@ def handle_callback_query(call):
     elif call.data == 'NO':
         bot.edit_message_text(chat_id=call.message.chat.id, message_id=call.message.message_id,
                               text=f'Вопрос: "{question}"\n\nВопрос обрабатывается...')
-        result = gpt_service.handleMessageToAnswer(
-            neural_service.generate_answer(gpt_service.handleMessageToQuestion(question))
-        )
+        questToHandle = question if config.GPT_URL is None else gpt_service.handleMessageToQuestion(question)
+        generated_answer = neural_service.generate_answer(questToHandle)
+        result = gpt_service.handleMessageToAnswer(generated_answer) \
+            if config.GPT_URL and len(generated_answer.split('.')) > 2 \
+            else generated_answer
+
         bot.edit_message_text(chat_id=config.TELEGRAM_CHAT_ID, message_id=call.message.message_id,
                               text=f'Вопрос: "{question}"\n\nОтвет: {result}', reply_markup=create_inline_keyboard())
 
